@@ -55,6 +55,9 @@
 	C:\Program Files\V-REP3\VREP_PRO_EDU\programming\include
 	C:\Program Files\V-REP3\VREP_PRO_EDU\programming\remoteApi
 	~~~
+## some practice
+1. mygrasper.ttt具体代码参考在txt文件中保存，参考了软件自带的scenes中的ur5grasper例子，难点是需要获取抓取过程中的各轴的角度，解决方法是提前采用`ik逆解混合模式`，不需要添加脚本，运行条件下拖动末端执行器的`球体`到参考点处，记录此时各轴角度。
+2. wait ..
 
 
  
