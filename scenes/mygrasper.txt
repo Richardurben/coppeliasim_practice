@@ -1,0 +1,130 @@
+-- This is a threaded script, and is just an example!
+-- enable ik_mode true or false
+enableIk=function(enable)
+    if enable then
+        sim.setObjectMatrix(ikTarget,-1,sim.getObjectMatrix(ikTip,-1))
+        for i=1,#jointHandles,1 do
+            sim.setJointMode(jointHandles[i],sim.jointmode_ik,1)
+        end
+
+        sim.setExplicitHandling(ikGroupHandle,0)
+    else
+        sim.setExplicitHandling(ikGroupHandle,1)
+        for i=1,#jointHandles,1 do
+            sim.setJointMode(jointHandles[i],sim.jointmode_force,0)
+        end
+    end
+end
+-- set gripper open or close(true/false)
+setGripperData=function(open,velocity,force)
+    if not velocity then
+        velocity=0.11
+    end
+    if not force then
+        force=20
+    end
+    if not open then
+        velocity=-velocity
+    end
+    local data=sim.packFloatTable({velocity,force})
+    sim.setStringSignal(modelName..'_rg2GripperData',data)
+end
+
+function sysCall_threadmain()
+    -- Initialize some values:
+    jointHandles={-1,-1,-1,-1,-1,-1}
+    for i=1,6,1 do
+        jointHandles[i]=sim.getObjectHandle('Franka_joint'..i)
+    end
+    ikGroupHandle=sim.getIkGroupHandle('Franka')
+    ikTip=sim.getObjectHandle('Franka_ikTip')
+    ikTarget=sim.getObjectHandle('Franka_ikTarget')
+    modelBase=sim.getObjectAssociatedWithScript(sim.handle_self)
+    modelName=sim.getObjectName(modelBase)
+
+    -- Set-up some of the RML vectors:
+    vel=180
+    accel=40
+    jerk=80
+    currentVel={0,0,0,0,0,0}
+    currentAccel={0,0,0,0,0,0}
+    maxVel={vel*math.pi/180,vel*math.pi/180,vel*math.pi/180,vel*math.pi/180,vel*math.pi/180,vel*math.pi/180}
+    maxAccel={accel*math.pi/180,accel*math.pi/180,accel*math.pi/180,accel*math.pi/180,accel*math.pi/180,accel*math.pi/180}
+    maxJerk={jerk*math.pi/180,jerk*math.pi/180,jerk*math.pi/180,jerk*math.pi/180,jerk*math.pi/180,jerk*math.pi/180}
+    targetVel={0,0,0,0,0,0}
+
+    ikMaxVel={0.4,0.4,0.4,1.8}
+    ikMaxAccel={0.8,0.8,0.8,0.9}
+    ikMaxJerk={0.6,0.6,0.6,0.8}
+    -- set pick and drop position
+    initialConfig={0,0,0,0,0,0}
+    pickConfig={}
+    dropConfig1={}
+    dropConfig2={}
+    dropConfig3={}
+    dropConfig4={}
+
+    dropConfigs={dropConfig1,dropConfig2,dropConfig3,dropConfig4}
+    -- tarque mode and open gripper
+    enableIk(false)
+    setGripperData(true)
+    -- move to first pick point
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        sim.rmlMoveToJointPositions(jointHandles,-1,currentVel,currentAccel,maxVel,maxAccel,maxJerk,pickConfig,targetVel)
+        print("joint_pick_position")
+    end
+    -- close to object and set workpoint
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        enableIk(true)
+        print("workpoint1")
+        pos=sim.getObjectPosition(ikTip,-1)
+        quat=sim.getObjectQuaternion(ikTip,-1)
+        sim.rmlMoveToPosition(ikTarget,-1,-1,nil,nil,ikMaxVel,ikMaxAccel,ikMaxJerk,{pos[1]+0.105,pos[2],pos[3]},quat,nil)
+        print("joint_pick_position_push")
+    end
+    -- close gripper
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        setGripperData(false)
+        print("set_gripper_velforce_close")
+        sim.wait(0.5)
+    end
+    -- far away from object
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        sim.rmlMoveToPosition(ikTarget,-1,-1,nil,nil,ikMaxVel,ikMaxAccel,ikMaxJerk,{pos[1],pos[2]-0.2,pos[3]+0.2},quat,nil)
+        print("joint_pick_position_back")
+    end
+    -- set some drop point 1-4
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        enableIk(false)
+        sim.rmlMoveToJointPositions(jointHandles,-1,currentVel,currentAccel,maxVel,maxAccel,maxJerk,dropConfigs[dropConfigIndex],targetVel)
+        print("joint_drop_position1-4")
+    end
+    -- set second workpoint and put down object
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        sim.setInt32Parameter(sim.intparam_current_page,2)
+        enableIk(true)
+        pos=sim.getObjectPosition(ikTip,-1)
+        quat=sim.getObjectQuaternion(ikTip,-1)
+        print("workpoint2")
+        sim.rmlMoveToPosition(ikTarget,-1,-1,nil,nil,ikMaxVel,ikMaxAccel,ikMaxJerk,{pos[1],pos[2],0.025+0.05*math.floor(0.1+droppedPartsCnt/2)},quat,nil)
+        print("joint_drop_position_down")
+    end
+    -- open gripper
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        setGripperData(true)
+        print("set_gripper_velforce_open")
+        sim.wait(0.5)
+    end
+    -- far away
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        sim.rmlMoveToPosition(ikTarget,-1,-1,nil,nil,ikMaxVel,ikMaxAccel,ikMaxJerk,pos,quat,nil)
+        print("joint_drop_position_up")
+    end
+    -- reset
+    if sim.getSimulationState()~=sim.simulation_advancing_abouttostop then
+        enableIk(false)
+    end
+    sim.rmlMoveToJointPositions(jointHandles,-1,currentVel,currentAccel,maxVel,maxAccel,maxJerk,initialConfig,targetVel)
+    print("reset")
+    sim.stopSimulation()
+end
