@@ -1,4 +1,4 @@
-## 使用coppliasim的心得
+## 使用coppliasim的notes
 
 - [x] vrep仿真可限制最大速度已达到缓速运行的目的，vrep可使用与机械臂配套的伺服驱动软件实现实时仿真，real-time模式(SmartServoLIN,LBR_iiwa_7_R800,udp通讯)。
 - [x] vrep仿真显示末端轨迹曲线，ABB IRB 4600-40-255模型中将graph挂到末端执行器上，可随动检测graph的位置，也可以直接定义末端连杆的位置，edit 3d curves，添加要显示轨迹的x-y-z的坐标。
